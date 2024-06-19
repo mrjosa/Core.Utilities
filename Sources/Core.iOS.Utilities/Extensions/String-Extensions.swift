@@ -34,4 +34,14 @@ public extension String {
         
         return hashString
     }
+    
+    func contains(_ pattern : String) throws -> Bool
+    {
+        if #available(iOS 16.0, *) {
+            return try self.contains(Regex(pattern))
+        }
+        else {
+            return self.range(of: pattern, options: .regularExpression) != nil
+        }
+    }
 }
