@@ -20,13 +20,13 @@ public class ImageAnimator
     
     public var animatedImages : [UIImage]? {
         didSet {
-            guard let duration = animationDuration, (animatedImages?.isEmpty ?? false) else {
+            guard (animatedImages?.isEmpty ?? false) else {
                 self.animationDuration = 1/animatedImages!.count
                 
                 return
             }
             
-            guard let images = animatedImages else {
+            guard let _ = animatedImages else {
                 stopAnimating()
                 
                 return
