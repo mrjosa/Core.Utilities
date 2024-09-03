@@ -9,8 +9,12 @@ import Foundation
 
 public class HttpClientFactory
 {
-    static func getInstance() -> HttpClient
+    public static func getInstance(_ dispatchOnMainThread : Bool = true) -> HttpClient
     {
-        return HttpClient()
+        let client = HttpClient()
+        
+        client.dispatchOnMainQueue = dispatchOnMainThread
+        
+        return client
     }
 }

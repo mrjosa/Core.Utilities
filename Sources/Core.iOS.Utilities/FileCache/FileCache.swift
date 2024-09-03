@@ -34,14 +34,7 @@ public class FileCache
             
     private func get(_ name : String, completion: @escaping ((Data?) -> Void))
     {
-        let fileManager = FileManager.default
-        
-        do {
-            // Get the URL for the documents directory
-            let directoryURL = try fileManager.url(for: .cachesDirectory, in: .userDomainMask, appropriateFor: nil, create: false)
-            
-            // Create the full file URL
-            let fileURL = directoryURL.appendingPathComponent("\(filePrefix)_\(name.sha256Hash())")
+        if let fileURL = SharedFileManager.getFilePath(name: "\(filePrefix)_\(name)".sha256Hash(), type: FileType.cache) {
             
             // Load the data
             DispatchQueue.global(qos: DispatchQoS.QoSClass.userInteractive).async {
@@ -49,10 +42,6 @@ public class FileCache
                 
                 completion(fileData)
             }
-        }
-        catch {
-            print("Error loading file: \(error)")
-            completion(nil)
         }
     }
     
@@ -68,8 +57,8 @@ public class FileCache
                     
                     let name = url.absoluteString
                     
-                    self.saveFile(named: name, withData: data) {
-                        completion?(data, nil)
+                    SharedFileManager.saveFile(named: "\(self.filePrefix)_\(name)".sha256Hash(), type: .cache, withData: data) { success in
+                        completion?(success ? data : nil, nil)
                     }
                 }
                 else {
@@ -79,33 +68,45 @@ public class FileCache
         }
     }
     
-    public func saveFile<T : Codable>(named fileName: String, withObject object : T, completion: @escaping () -> Void)
+    public func getFile<T : Decodable>(named fileName: String, completion: @escaping (T?) -> Void)
     {
-        let encoder = JSONEncoder()
-        do
-        {
-            let data = try encoder.encode(object)
+        if let filePath = SharedFileManager.getFilePath(name: fileName, type: .cache) {
             
-            DispatchQueue.global(qos: .userInteractive).async {
-                self.saveFile(named: fileName, withData: data, completion: completion)
+            DispatchQueue.global(qos: DispatchQoS.QoSClass.userInteractive).async {
+                
+                if let fileData = try? Data(contentsOf: filePath) {
+                    
+                    let str = String(data: fileData, encoding: .utf8)
+                    
+                    let decoder = JSONDecoder()
+                    
+                    let value = try? decoder.decode(T.self, from: fileData)
+                    
+                    completion(value)
+                }
+                else {
+                    // should be data but make sure...
+                    
+                    completion(nil)
+                }
             }
         }
-        catch {
-            print("\(error)")
+        else {
+            // no file found!
+            completion(nil)
         }
     }
     
-    public func saveFile(named name: String, withData data : Data, completion: (() -> Void))
+    public func saveData(named fileName: String, withData data : Data, completion: @escaping (Bool) -> Void)
     {
-        let fileManager = FileManager.default
+        let encoder = JSONEncoder()
         
-        if let directory = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first {
-            
-            let filePath = directory.appendingPathComponent("\(filePrefix)_\(name.sha256Hash())")
-            
-            DispatchQueue.global(qos: .userInteractive).async {
-                try? data.write(to: filePath)
-            }
+        do
+        {
+            SharedFileManager.saveFile(named: fileName, type: .cache, withData: data, completion: completion)
+        }
+        catch {
+            print("\(error)")
         }
     }
     

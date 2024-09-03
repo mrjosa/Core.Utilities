@@ -20,10 +20,13 @@ public class HttpClient : NSObject, URLSessionTaskDelegate
     
     public var authenticationScheme = "Bearer"
     
+    public var baseUrl : URL?
     public var timeout : TimeInterval = 60
     public var cachePolicy = NSURLRequest.CachePolicy.reloadIgnoringLocalCacheData
     public var dispatchOnMainQueue = true
-    
+    public var cookieStorage = HTTPCookieStorage.shared
+    public var handleCookies : Bool = true
+    public var acceptPolicy : HTTPCookie.AcceptPolicy = HTTPCookie.AcceptPolicy.onlyFromMainDocumentDomain
     public var authenticationToken : (() -> String?)?
     
     public var onAuthenticationRequiredEvent: ((Data?, URLResponse) -> Void)?
@@ -53,7 +56,7 @@ public class HttpClient : NSObject, URLSessionTaskDelegate
     }
     
     public func get(_ url : URL,
-                    useCache: Bool,
+                    useCache: Bool = false,
                     httpHeaders : [String: String?] = [:],
                     completion : @escaping (Data?, Error?, URLResponse?) -> Void)
     {
@@ -125,10 +128,12 @@ public class HttpClient : NSObject, URLSessionTaskDelegate
                          completion : @escaping (Data?, Error?, URLResponse?) -> Void,
                          onChallenge: ((URLAuthenticationChallenge) -> (URLSession.AuthChallengeDisposition, URLCredential?))?)
     {
+        let uri = URL(string: url.absoluteString, relativeTo: self.baseUrl)
+        
         if useCache == true &&
             method == HttpMethod.get,
            let kv = cache.first(where: { (cacheUrl: URL, data: Any) in
-               return url == cacheUrl
+               return uri == cacheUrl
            }) {
             self.dispatchOnCorrectThread {
                 completion(kv.data, nil, nil)
@@ -138,11 +143,16 @@ public class HttpClient : NSObject, URLSessionTaskDelegate
             
             self.onChallengeEvent = onChallengeEvent ?? defaultChallengeEvent
             
-            let request = NSMutableURLRequest(url: url);
+            let request = NSMutableURLRequest(url: uri ?? url);
             
-            let session = URLSession.shared
+            let session = URLSession(configuration: URLSessionConfiguration.default, delegate: self, delegateQueue: OperationQueue.current)
+            
             session.configuration.requestCachePolicy = self.cachePolicy
             session.configuration.timeoutIntervalForRequest = timeout ?? self.timeout
+            session.configuration.httpShouldSetCookies = self.handleCookies
+            session.configuration.httpCookieStorage = self.cookieStorage
+            session.configuration.httpCookieAcceptPolicy = self.acceptPolicy
+            
             request.httpMethod = method
             // TODO: support urlencoded?
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -270,5 +280,9 @@ public class HttpClient : NSObject, URLSessionTaskDelegate
         else {
             block()
         }
+    }
+    
+    public func urlSession(_ session: URLSession, task: URLSessionTask, didReceiveInformationalResponse response: HTTPURLResponse) {
+        let a = 2
     }
 }
